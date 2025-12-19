@@ -25,11 +25,11 @@ ai_config = types.GenerateContentConfig(
 
 user_chat_mode = {}
 
-DB_HOST = "localhost"      
-DB_NAME = "testdb"  
-DB_USER = "admin" 
-DB_PASSWORD = "123456"    
-DB_PORT = "5432"         
+DB_HOST = os.getenv("DB_HOST")      
+DB_NAME = os.getenv("DB_NAME")  
+DB_USER = os.getenv("DB_USER")  
+DB_PASSWORD = os.getenv("DB_PASSWORD")    
+DB_PORT = os.getenv("DB_PORT")      
 
 def save_log(user_id, message, sender):
     """
@@ -305,3 +305,4 @@ def handle_message(event):
 if __name__ == '__main__':
 
     app.run()
+
