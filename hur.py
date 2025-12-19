@@ -12,12 +12,12 @@ from linebot.models import (
 from google import genai
 from google.genai import types
 app = Flask(__name__)
+import os
 
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-client = genai.Client(api_key='AIzaSyCmO4B7cVd2aiEnGWO1P11oMhZisXRhOPY')
-
-line_bot_api = LineBotApi('6fgVKIAzeUaNSy+Wy32kroiIMwjeX+Tr/FcOFRXDtIjPsf7ostFLUl1WFkIN0honayqJ+6BquddikU1m6iq0MEgiq7i6Cq1lyOQB683GU+BMRj/pgEf3dbIxo4RGeDl/6J1vWK0sefXzD+nPlhk02gdB04t89/1O/w1cDnyilFU=')
-handler = WebhookHandler('af297940c115f207524c3573f7076f7d')
+line_bot_api = LineBotApi(os.getenv("LINE_BOT_TOKEN"))
+handler = WebhookHandler(os.getenv("LINE_BOT_SECRET"))
 
 ai_config = types.GenerateContentConfig(
     system_instruction="你是一個熱情、專業的台灣女團 HUR+ (Crimzon) 的粉絲小幫手，你的暱稱是『雷雷夥伴』。請用繁體中文回答粉絲的問題。如果粉絲問到成員資訊，請友善地介紹。回答要活潑一點，可以使用 Emoji。",
@@ -303,4 +303,5 @@ def handle_message(event):
             # save_log(user_id, msg, 'bot')
 
 if __name__ == '__main__':
+
     app.run()
