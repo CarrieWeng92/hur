@@ -1,0 +1,6 @@
+flask
+flask-sqlalchemy
+psycopg2
+line-bot-sdk==1.18.0
+gunicorn
+google-genai
