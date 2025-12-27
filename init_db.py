@@ -1,22 +1,20 @@
 import os
 import psycopg2
 
-# 1. 取得 Render 環境變數中的資料庫連線網址
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 if not DATABASE_URL:
-    print("錯誤：找不到 DATABASE_URL，請確認你是在 Render 環境執行，或已設定環境變數。")
+    print("錯誤：找不到 DATABASE_URL")
     exit()
 
-# 2. 連線資料庫
 conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 cursor = conn.cursor()
 
 try:
-    print("正在建立資料表 hur_members...")
+    print("正在檢查並建立資料表...")
     
-    # 建立資料表指令
-    create_table_query = """
+    # 1. 建立 hur_members 表 (HUR+ 成員資訊)
+    create_members_table = """
     CREATE TABLE IF NOT EXISTS hur_members (
         id SERIAL PRIMARY KEY,
         name VARCHAR(50) NOT NULL,
@@ -24,16 +22,23 @@ try:
         intro TEXT
     );
     """
-    cursor.execute(create_table_query)
+    cursor.execute(create_members_table)
+
+    # 2. 建立 user_logs 表 (新增的部分：用來存對話紀錄)
+    create_logs_table = """
+    CREATE TABLE IF NOT EXISTS user_logs (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+    cursor.execute(create_logs_table)
     
-    # 3. 檢查裡面是不是空的，如果是空的才寫入資料 (避免重複寫入)
+    # 3. 檢查成員資料是否需要寫入
     cursor.execute("SELECT COUNT(*) FROM hur_members;")
-    count = cursor.fetchone()[0]
-    
-    if count == 0:
-        print("資料表為空，正在寫入 HUR+ 成員資料...")
-        
-        # 準備要寫入的資料 (請確認這裡的圖片檔名跟你實際存的一樣)
+    if cursor.fetchone()[0] == 0:
+        print("正在寫入 HUR+ 成員資料...")
         members_data = [
             ('利善榛', 'cindy.png', '1995年3月18日\nLeader、Sub-Vocal、Visual'),
             ('裴頡', 'jasmine.png', '1997年3月13日\nLead Vocal、Center'),
@@ -45,16 +50,11 @@ try:
             ('林詩雅', 'grace.png', '1999年1月13日\nSub-Vocal、Sub-Dancer'),
             ('香蘭', 'lanlan.png', '2008年3月13日\nSub-Vocal、Maknae')
         ]
-        
-        insert_query = "INSERT INTO hur_members (name, filename, intro) VALUES (%s, %s, %s)"
-        cursor.executemany(insert_query, members_data)
-        print(f"成功寫入 {len(members_data)} 筆成員資料！")
-    else:
-        print(f"資料表內已有 {count} 筆資料，跳過寫入步驟。")
+        cursor.executemany("INSERT INTO hur_members (name, filename, intro) VALUES (%s, %s, %s)", members_data)
+        print("成員資料寫入完成。")
 
-    # 4. 提交變更
     conn.commit()
-    print("資料庫初始化完成！")
+    print("資料庫所有表格初始化完成！")
 
 except Exception as e:
     print("發生錯誤：", e)
