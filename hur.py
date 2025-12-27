@@ -294,6 +294,31 @@ def handle_message(event):
              line_bot_api.reply_message(
                  event.reply_token, 
                  TextSendMessage(text='發生錯誤!'))
+
+    elif mtext == '@查紀錄':
+        # 這是隱藏功能，只有你知道
+        try:
+            conn = psycopg2.connect(os.environ.get('DATABASE_URL'), sslmode='require')
+            cur = conn.cursor()
+            
+            # 撈出最近 10 筆紀錄 (依照時間倒序)
+            cur.execute("SELECT user_id, message, created_at FROM user_logs ORDER BY created_at DESC LIMIT 10")
+            rows = cur.fetchall()
+            
+            report = "📋 最近 10 筆對話紀錄：\n\n"
+            for row in rows:
+                # row[0] 是 ID, row[1] 是訊息, row[2] 是時間
+                # 我們把時間轉成字串比較好讀
+                time_str = row[2].strftime('%m/%d %H:%M')
+                # 簡化 user_id 只顯示後 4 碼，保護版面
+                short_id = row[0][-4:]
+                report += f"[{time_str}] {short_id}: {row[1]}\n"
+                
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=report))
+            conn.close()
+            
+        except Exception as e:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"查詢失敗：{e}"))
             
     else:
         if user_chat_mode.get(user_id) == True:
@@ -333,5 +358,6 @@ def handle_message(event):
 if __name__ == '__main__':
 
     app.run()
+
 
 
