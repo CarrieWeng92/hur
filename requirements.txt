@@ -1,6 +1,7 @@
 flask
 flask-sqlalchemy
 psycopg2
+psycopg2-binary
 line-bot-sdk==1.18.0
 gunicorn
 google-genai
