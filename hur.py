@@ -31,19 +31,51 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")    
 DB_PORT = os.getenv("DB_PORT")      
 
+# 放在 app.py 上面 import 的地方附近
+def get_hur_data_prompt():
+    try:
+        # 連線資料庫 (記得要有 import psycopg2 和 os)
+        conn = psycopg2.connect(os.environ.get('DATABASE_URL'), sslmode='require')
+        cursor = conn.cursor()
+        
+        # 抓取所有成員的名字和擔當
+        cursor.execute("SELECT name, intro FROM hur_members")
+        rows = cursor.fetchall()
+        
+        # 把抓到的資料變成一段文字 (小抄)
+        # 例如："成員：利善榛 (HUR+ 隊長...), 裴頡 (擔當...)"
+        info_text = "HUR+ 的官方成員資料如下：\n"
+        count = 0
+        for row in rows:
+            count += 1
+            info_text += f"{count}. {row[0]}：{row[1]}\n"
+            
+        info_text += f"目前共有 {count} 位成員。\n請根據以上資料回答使用者的問題。"
+        
+        cursor.close()
+        conn.close()
+        return info_text
+        
+    except Exception as e:
+        print("抓取成員資料失敗:", e)
+        return "HUR+ 是一個台灣女團。" # 萬一資料庫壞掉的備用小抄
+
 def save_log(user_id, message, sender):
     """
-    sender: 輸入 'user' 代表使用者, 'bot' 代表機器人
+    sender: 輸入 'user' 或 'bot'
     """
     conn = None
     try:
-        conn = psycopg2.connect(
-            host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASSWORD, port=DB_PORT
-        )
+        # 修改點 1: 使用 DATABASE_URL 連線
+        conn = psycopg2.connect(os.environ.get('DATABASE_URL'), sslmode='require')
         cur = conn.cursor()
-        # 這裡多寫入一個 sender 欄位
-        sql = "INSERT INTO user_logs (user_id, message, sender) VALUES (%s, %s, %s)"
-        cur.execute(sql, (user_id, message, sender))
+        
+        # 修改點 2: 配合目前的資料表結構，不寫入 sender 欄位
+        # 我們把 sender 加在訊息內容前面，例如 "[Bot] 訊息內容"
+        log_message = f"[{sender}] {message}"
+        
+        sql = "INSERT INTO user_logs (user_id, message) VALUES (%s, %s)"
+        cur.execute(sql, (user_id, log_message))
         conn.commit()
     except Exception as e:
         print(f"Log Error ({sender}): {e}")
@@ -66,20 +98,7 @@ def callback():
 def handle_message(event):
     mtext = event.message.text
     user_id = event.source.user_id
-    try:
-        conn = psycopg2.connect(
-            host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASSWORD, port=DB_PORT
-        )
-        cur = conn.cursor()
-        # 只要記 ID 和 訊息，時間資料庫會自動填
-        cur.execute("INSERT INTO user_logs (user_id, message) VALUES (%s, %s)", (user_id, mtext))
-        conn.commit()
-    except Exception as e:
-        print(f"Log Error: {e}") # 紀錄失敗只印錯誤，不要讓機器人當機
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
+    save_log(user_id, mtext, 'user')
     current_url = request.host_url.replace('http://', 'https://')
     baseurl = current_url + 'static/'
 
@@ -279,10 +298,19 @@ def handle_message(event):
     else:
         if user_chat_mode.get(user_id) == True:
             try:
+                # --- 修改部分開始：加入小抄邏輯 ---
+                
+                # 1. 呼叫函式取得資料庫裡正確的成員資料 (小抄)
+                hur_data = get_hur_data_prompt()
+                
+                # 2. 組合提示詞：把小抄放在使用者的問題前面
+                full_prompt = f"{hur_data}\n\n使用者問：{mtext}"
+                
+                # 3. 把組合好的 full_prompt 丟給 AI
                 response = client.models.generate_content(
                     model="gemini-2.5-flash",
-                    config=ai_config, 
-                    contents=mtext
+                    config=ai_config,
+                    contents=full_prompt 
                 )
                 result = response.text
                 
@@ -305,4 +333,5 @@ def handle_message(event):
 if __name__ == '__main__':
 
     app.run()
+
 
